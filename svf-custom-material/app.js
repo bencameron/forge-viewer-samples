@@ -10,12 +10,12 @@ async function setupViewer() {
                 .then(response => response.json())
                 .then(data => {
 
-                    let accessToken = data["accessToken"];
-                    let expireTimeSeconds = data["expiresIn"];
+                    let accessToken = data.accessToken;
+                    let expireTimeSeconds = data.expiresIn;
                     onGetAccessToken(accessToken, expireTimeSeconds);
                 })
         },
-        useADP: false,
+        useADP: false
     };
     
     await new Promise(function (resolve, reject) {
@@ -26,13 +26,12 @@ async function setupViewer() {
 
     viewer = new Autodesk.Viewing.GuiViewer3D(document.getElementById(divId), {});
     viewer.start();
-    await viewer.loadExtension('Autodesk.Viewing.SceneBuilder');
-    ext = viewer.getExtension('Autodesk.Viewing.SceneBuilder');
-    modelBuilder = await ext.addNewModel({});
 
-    addCustomMesh(modelBuilder);
-    await addSvf("urn:dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6YnVya2UtZmlsZXMvMjcwLTAxMzBfd2hpdGUuZHdn", viewer, new THREE.Vector3(-250, 0, 0));
-    await addSvf("urn:dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6YnVya2UtZmlsZXMvMjcwLTAxMzBfd2hpdGUuZHdn", viewer, new THREE.Vector3(50, 0, 0));
+    const cacheDate = new Date();
+    cacheDate.setDate(cacheDate.getDate() - 1);
+    Autodesk.Viewing.endpoint['HTTP_REQUEST_HEADERS']['If-Modified-Since'] = cacheDate.toUTCString();
+
+    await addSvf("urn:dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6YnVya2UtZmlsZXMvMjcwLTAxMzBfd2hpdGUuZHdn", viewer, new THREE.Vector3(-10, 0, 0));
 
     const camera = viewer.getCameraFromViewArray([
         0, -50, 50,
@@ -45,19 +44,8 @@ async function setupViewer() {
     ]);
     viewer.impl.setViewFromCamera(camera, true, true);
     viewer.impl.controls.recordHomeView();
-}
 
-function addCustomMesh(modelBuilder) {
-    purple = new THREE.MeshPhongMaterial({
-        color: new THREE.Color(1, 0, 1)
-    });
-
-    // Torus
-    let geometry = new THREE.TorusGeometry(10, 2, 32, 32);
-
-    bufferGeometry = new THREE.BufferGeometry().fromGeometry(geometry);
-    mesh = new THREE.Mesh(bufferGeometry, purple);
-    modelBuilder.addMesh(mesh);
+    viewer.addEventListener(Autodesk.Viewing.AGGREGATE_SELECTION_CHANGED_EVENT, onSelection)
 }
 
 async function addSvf(documentId, viewer, position) {
@@ -66,7 +54,7 @@ async function addSvf(documentId, viewer, position) {
 
     return new Promise((resolve, reject) => {
         let onDocumentLoadSuccess = (doc) => {
-            var viewables = doc.getRoot().getDefaultGeometry();
+            var viewables = doc.getRoot().search({'role': '3d'})[0];
 
             let opt = {
                 placementTransform: matrix,
@@ -87,4 +75,34 @@ async function addSvf(documentId, viewer, position) {
 
         Autodesk.Viewing.Document.load(documentId, onDocumentLoadSuccess, onDocumentLoadFailure);
     })
+  }
+
+  function onSelection(event) {
+    if (event.selections && event.selections.length > 0) {
+        let selection = event.selections[0];
+        setFragmentMaterial(selection.model, selection.dbIdArray[0])
+    }    
+  }
+
+  function setFragmentMaterial(model, nodeId) {
+    const myCustomMaterial = new THREE.MeshPhongMaterial({
+      side: THREE.DoubleSide,
+      reflectivity: 0.0,
+      flatShading: true,
+      transparent: true,
+      opacity: 1,
+      color: new THREE.Color(0x0000ff)
+    });
+
+    const materials = viewer.impl.matman();
+    materials.addMaterial("MyCustomMaterial", myCustomMaterial, true);
+
+    const tree = model.getData().instanceTree;
+
+    tree.enumNodeFragments(nodeId, (fragId) => {
+      model.getFragmentList().setMaterial(fragId, myCustomMaterial);
+    })
+
+    viewer.impl.invalidate(true);
+    viewer.clearSelection();
   }
