@@ -56,9 +56,9 @@ class TempExtension extends Autodesk.Viewing.Extension {
 
 
                     // setTimeout(() => {
-                        // this.replaceOriginalWithCustom();
-                        this.replaceMaterialOnOriginalModel();
-                        this.addCustomMesh();
+                    this.replaceOriginalWithCustom();
+                    // this.replaceMaterialOnOriginalModel();
+                    this.addCustomMesh();
                     // }, 2000);
                 });
         })
@@ -68,11 +68,21 @@ class TempExtension extends Autodesk.Viewing.Extension {
         this.viewer.setGhosting(false)
         const ids = Object.keys(this.tree.nodeAccess.dbIdToIndex)
         ids.forEach(id => {
+
             this.tree.enumNodeFragments(parseInt(id), fragID => {
                 console.log("ID = ", id, "; FragID = ", fragID, " | Replacing model");
-                this.modelBuilder.addMesh(this.getMeshFromFragment(fragID))
+                this.viewer.hide(parseInt(id));
+                let mesh = null;
+                try {
+                    mesh = this.getMeshFromFragment(fragID)
+                } catch (err) {
+                    console.log("Problem getting mesh for ID = ", id, "; FragID = ", fragID)
+                    return;
+                }
+                this.modelBuilder.addMesh(mesh);
+
             })
-            this.viewer.hide(id);
+
         })
     }
 
@@ -88,6 +98,7 @@ class TempExtension extends Autodesk.Viewing.Extension {
 
     getMeshFromFragment(fragmentId) {
 
+
         let geom = new THREE.Geometry();
         let renderProxy = this.viewer.impl.getRenderProxy(this.viewer.model, fragmentId);
         let VE = Autodesk.Viewing.Private.VertexEnumerator;
@@ -100,7 +111,10 @@ class TempExtension extends Autodesk.Viewing.Extension {
             geom.faces.push(new THREE.Face3(a, b, c))
         });
 
+
         geom.computeFaceNormals();
+
+
         let mesh = new THREE.Mesh(
             new THREE.BufferGeometry().fromGeometry(geom),
             this.viewer.impl.matman()._materials["my_material"]);
