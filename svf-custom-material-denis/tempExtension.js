@@ -16,7 +16,7 @@ class TempExtension extends Autodesk.Viewing.Extension {
 
     load() {
         console.log('tempExtension is loaded!');
-        this.viewer.addEventListener(Autodesk.Viewing.OBJECT_TREE_CREATED_EVENT,
+        this.viewer.addEventListener(Autodesk.Viewing.GEOMETRY_LOADED_EVENT,
             this.customize);
 
         return true;
@@ -29,7 +29,7 @@ class TempExtension extends Autodesk.Viewing.Extension {
     }
 
     customize() {
-        this.viewer.removeEventListener(Autodesk.Viewing.OBJECT_TREE_CREATED_EVENT,
+        this.viewer.removeEventListener(Autodesk.Viewing.GEOMETRY_LOADED_EVENT,
             this.customize);
 
         this.tree = this.viewer.model.getData().instanceTree;
@@ -44,6 +44,8 @@ class TempExtension extends Autodesk.Viewing.Extension {
             color: new THREE.Color(0x0000ff)
         })
 
+        this.viewer.impl.matman().addMaterial("my_material", this.myCustomMaterial, true);
+
         this.viewer.loadExtension("Autodesk.Viewing.SceneBuilder").then(() => {
             this.sceneBuilder = this.viewer.getExtension("Autodesk.Viewing.SceneBuilder");
 
@@ -53,21 +55,20 @@ class TempExtension extends Autodesk.Viewing.Extension {
                     window.modelBuilder = modelBuilder;
 
 
-                    // this.replaceOriginalWithCustom();
-                    this.replaceMaterialOnOriginalModel();
-                    this.addCustomMesh();
-
-
-
+                    // setTimeout(() => {
+                        // this.replaceOriginalWithCustom();
+                        this.replaceMaterialOnOriginalModel();
+                        this.addCustomMesh();
+                    // }, 2000);
                 });
         })
     }
 
     replaceOriginalWithCustom() {
         this.viewer.setGhosting(false)
-        const ids = Object.values(this.tree.nodeAccess.dbIdToIndex)
+        const ids = Object.keys(this.tree.nodeAccess.dbIdToIndex)
         ids.forEach(id => {
-            this.tree.enumNodeFragments(id, fragID => {
+            this.tree.enumNodeFragments(parseInt(id), fragID => {
                 console.log("ID = ", id, "; FragID = ", fragID, " | Replacing model");
                 this.modelBuilder.addMesh(this.getMeshFromFragment(fragID))
             })
@@ -76,11 +77,11 @@ class TempExtension extends Autodesk.Viewing.Extension {
     }
 
     replaceMaterialOnOriginalModel() {
-        const ids = Object.values(this.tree.nodeAccess.dbIdToIndex)
+        const ids = Object.keys(this.tree.nodeAccess.dbIdToIndex)
         ids.forEach(id => {
-            this.tree.enumNodeFragments(id, fragID => {
+            this.tree.enumNodeFragments(parseInt(id), fragID => {
                 console.log("ID = ", id, "; FragID = ", fragID, " | Changing material");
-                this.viewer.model.getFragmentList().setMaterial(fragID, this.myCustomMaterial);
+                this.viewer.model.getFragmentList().setMaterial(fragID, this.viewer.impl.matman()._materials["my_material"]);
             })
         })
     }
@@ -102,7 +103,7 @@ class TempExtension extends Autodesk.Viewing.Extension {
         geom.computeFaceNormals();
         let mesh = new THREE.Mesh(
             new THREE.BufferGeometry().fromGeometry(geom),
-            this.myCustomMaterial);
+            this.viewer.impl.matman()._materials["my_material"]);
 
         mesh.matrix = renderProxy.matrixWorld.clone();
 
@@ -114,7 +115,7 @@ class TempExtension extends Autodesk.Viewing.Extension {
     addCustomMesh() {
 
 
-        let box = new THREE.BoxGeometry(200, 200, 200);
+        let box = new THREE.BoxGeometry(20, 20, 20);
 
         let bufferGeometry = new THREE.BufferGeometry().fromGeometry(box);
         let mesh = new THREE.Mesh(bufferGeometry, this.myCustomMaterial);
