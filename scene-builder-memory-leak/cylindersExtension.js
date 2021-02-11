@@ -112,7 +112,9 @@ class CylindersExtension extends Autodesk.Viewing.Extension {
         this.meshes.forEach(mesh => {
             this.modelBuilder.removeMesh(mesh);
             this.modelBuilder.removeGeometry(mesh.geometry);
-            matMan.removeMaterial(mesh.material);
+
+            const matName = `model:1|mat:${mesh.material.materialManagerName}`;
+            matMan.removeMaterial(matName);
         })
     
         this.meshes.length = 0;
